@@ -344,6 +344,7 @@
     </div>
     <div class="acc-actions" id="accActionsLoggedIn" style="display:none;">
       <span class="acc-email" id="accEmail"></span>
+      <button type="button" class="acc-btn" id="openAccountSettings">アカウント設定</button>
       <button type="button" class="acc-btn" id="logoutBtn">ログアウト</button>
     </div>
   </div>
@@ -533,6 +534,49 @@
       </div>
       <p class="hint auth-switch" id="authSwitch">アカウントをお持ちでない場合は <a href="#" id="switchToSignup">新規登録</a></p>
       <p class="hint auth-forgot" id="authForgotWrap"><a href="#" id="forgotPassword">パスワードをお忘れの場合</a></p>
+    </form>
+  </div>
+</div>
+<div class="overlay" id="settingsOverlay">
+  <div class="modal">
+    <h2><span>アカウント設定</span><span class="x" id="closeSettings">×</span></h2>
+
+    <form id="changePasswordForm">
+      <div class="divider"><span>パスワードの変更</span></div>
+      <div class="field">
+        <label>現在のパスワード</label>
+        <input type="password" id="cpCurrent" required autocomplete="current-password">
+      </div>
+      <div class="field">
+        <label>新しいパスワード</label>
+        <input type="password" id="cpNew" placeholder="6文字以上" required minlength="6" autocomplete="new-password">
+      </div>
+      <div class="field">
+        <label>新しいパスワード(確認)</label>
+        <input type="password" id="cpConfirm" required minlength="6" autocomplete="new-password">
+      </div>
+      <p class="hint auth-error" id="cpError" style="display:none;"></p>
+      <div class="modal-actions">
+        <button type="submit" class="btn primary">パスワードを変更</button>
+      </div>
+    </form>
+
+    <form id="deleteAccountForm">
+      <div class="divider"><span>アカウントの削除</span></div>
+      <p class="hint" style="margin-top:0; color:var(--red);">アカウントとクラウド上のデータが完全に削除されます。この操作は取り消せません。このブラウザに残っているローカルのキャッシュは削除されません。</p>
+      <div class="field">
+        <label>現在のパスワード</label>
+        <input type="password" id="delCurrent" required autocomplete="current-password">
+      </div>
+      <div class="field">
+        <label>確認のため「削除」と入力してください</label>
+        <input type="text" id="delConfirmText" placeholder="削除" required>
+      </div>
+      <p class="hint auth-error" id="delError" style="display:none;"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="settingsCancel">キャンセル</button>
+        <button type="submit" class="btn" id="deleteAccountBtn" style="background:var(--red); border-color:var(--red); color:#fff;">アカウントを削除</button>
+      </div>
     </form>
   </div>
 </div>
@@ -1366,7 +1410,10 @@
       'auth/user-not-found':'このメールアドレスは登録されていません',
       'auth/too-many-requests':'試行回数が多すぎます。しばらくしてから再度お試しください',
       'auth/invalid-credential':'メールアドレスまたはパスワードが正しくありません',
-      'auth/network-request-failed':'通信エラーが発生しました。接続を確認してください'
+      'auth/network-request-failed':'通信エラーが発生しました。接続を確認してください',
+      'auth/requires-recent-login':'セキュリティのため、再度パスワードを入力してください',
+      'auth/user-mismatch':'現在ログイン中のアカウントと一致しません',
+      'auth/user-token-expired':'セッションの有効期限が切れました。再度ログインしてください'
     };
     return map[err.code] || (err.message || 'エラーが発生しました');
   }
@@ -1405,6 +1452,89 @@
   authOverlay.addEventListener('click', (e)=>{ if(e.target === authOverlay) closeAuth(); });
 
   document.getElementById('logoutBtn').addEventListener('click', async ()=>{
+    // ---- account settings: change password / delete account ----
+const settingsOverlay = document.getElementById('settingsOverlay');
+const changePasswordForm = document.getElementById('changePasswordForm');
+const deleteAccountForm = document.getElementById('deleteAccountForm');
+
+function openSettings(){
+  document.getElementById('cpCurrent').value = '';
+  document.getElementById('cpNew').value = '';
+  document.getElementById('cpConfirm').value = '';
+  document.getElementById('cpError').style.display = 'none';
+  document.getElementById('delCurrent').value = '';
+  document.getElementById('delConfirmText').value = '';
+  document.getElementById('delError').style.display = 'none';
+  settingsOverlay.classList.add('show');
+}
+function closeSettings(){ settingsOverlay.classList.remove('show'); }
+document.getElementById('openAccountSettings').addEventListener('click', openSettings);
+document.getElementById('closeSettings').addEventListener('click', closeSettings);
+document.getElementById('settingsCancel').addEventListener('click', closeSettings);
+settingsOverlay.addEventListener('click', (e)=>{ if(e.target === settingsOverlay) closeSettings(); });
+
+async function reauthenticate(password){
+  const cred = firebase.auth.EmailAuthProvider.credential(currentUser.email, password);
+  await currentUser.reauthenticateWithCredential(cred);
+}
+
+changePasswordForm.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const errEl = document.getElementById('cpError');
+  errEl.style.display = 'none';
+  const current = document.getElementById('cpCurrent').value;
+  const next = document.getElementById('cpNew').value;
+  const confirm = document.getElementById('cpConfirm').value;
+  if(next !== confirm){
+    errEl.textContent = '新しいパスワードが一致しません';
+    errEl.style.display = 'block';
+    return;
+  }
+  const submitBtn = changePasswordForm.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  try{
+    await reauthenticate(current);
+    await currentUser.updatePassword(next);
+    toast('パスワードを変更しました');
+    document.getElementById('cpCurrent').value = '';
+    document.getElementById('cpNew').value = '';
+    document.getElementById('cpConfirm').value = '';
+  }catch(err){
+    errEl.textContent = translateAuthError(err);
+    errEl.style.display = 'block';
+  }finally{
+    submitBtn.disabled = false;
+  }
+});
+
+deleteAccountForm.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const errEl = document.getElementById('delError');
+  errEl.style.display = 'none';
+  const password = document.getElementById('delCurrent').value;
+  const confirmText = document.getElementById('delConfirmText').value.trim();
+  if(confirmText !== '削除'){
+    errEl.textContent = '確認欄に「削除」と入力してください';
+    errEl.style.display = 'block';
+    return;
+  }
+  if(!confirm('本当にアカウントを削除しますか？この操作は取り消せません。')) return;
+  const delBtn = document.getElementById('deleteAccountBtn');
+  delBtn.disabled = true;
+  try{
+    await reauthenticate(password);
+    const uid = currentUser.uid;
+    try{ await fbDb.collection('users').doc(uid).delete(); }catch(e2){ /* non-fatal */ }
+    await currentUser.delete();
+    toast('アカウントを削除しました');
+    closeSettings();
+  }catch(err){
+    errEl.textContent = translateAuthError(err);
+    errEl.style.display = 'block';
+  }finally{
+    delBtn.disabled = false;
+  }
+});
     if(fbAuth){ await fbAuth.signOut(); toast('ログアウトしました'); }
   });
 
