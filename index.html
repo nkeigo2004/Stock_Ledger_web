@@ -209,6 +209,9 @@
   .spark-delta.up{ color:var(--green); }
   .spark-delta.down{ color:var(--red); }
   .spark-empty{ color:var(--muted-2); font-size:10px; }
+  .fund-row{ display:flex; gap:6px; margin-top:7px; flex-wrap:wrap; }
+  .fund-chip{font-size:9.5px; letter-spacing:.03em; color:var(--muted); background:var(--bg); border:1px solid var(--line); border-radius:4px; padding:3px 7px; }
+  .fund-chip b{ color:var(--text); font-weight:600; margin-left:4px; }
 
   .iconbtn.chart:hover{ color:var(--green); border-color:var(--green-dim); }
 
@@ -447,6 +450,28 @@
       </div>
       <p class="hint">保有株数が1以上 → 「保有中」。買いたい価格を入力 → 「買い検討」。保有中かつ売りたい価格を入力 → 「売り検討」に自動で分類されます。</p>
 
+      <div class="divider"><span>ファンダメンタルズ (決算ごとに更新)</span></div>
+      <div class="row2">
+        <div class="field">
+          <label>PER (倍)</label>
+          <input type="number" id="fPER" placeholder="例: 15.2" step="0.01">
+        </div>
+        <div class="field">
+          <label>PBR (倍)</label>
+          <input type="number" id="fPBR" placeholder="例: 1.3" step="0.01">
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>配当利回り (%)</label>
+          <input type="number" id="fDivYield" placeholder="例: 2.5" step="0.01">
+        </div>
+        <div class="field">
+          <label>ROE (%)</label>
+          <input type="number" id="fROE" placeholder="例: 12.0" step="0.01">
+        </div>
+      </div>
+
       <div class="divider"><span>ニュース・関連リンク (最大2件)</span></div>
       <div class="field">
         <label>ニュース1 タイトル</label>
@@ -594,7 +619,7 @@
   let currentSortDir = 'desc'; // desc = newest-added first by default
 
   // ---- 銘柄コード⇄社名DB (自動補完用。網羅率は限定的、範囲外は手入力)
-  //      日経225+α(JPY) / 米国主要銘柄(USD) / スイスSMI主要銘柄(CHF) ----
+  //      日経(JPY) / 米国主要銘柄(USD) / スイスSMI主要銘柄(CHF) ----
   const STOCK_DB = {
     // --- 日本 (JPY) ---
     "1332":{n:"ニッスイ",c:"JPY"},"1605":{n:"INPEX",c:"JPY"},"1721":{n:"コムシスホールディングス",c:"JPY"},"1801":{n:"大成建設",c:"JPY"},"1802":{n:"大林組",c:"JPY"},
@@ -643,21 +668,20 @@
     "9503":{n:"関西電力",c:"JPY"},"9531":{n:"東京ガス",c:"JPY"},"9532":{n:"大阪ガス",c:"JPY"},"9602":{n:"東宝",c:"JPY"},"9735":{n:"セコム",c:"JPY"},
     "9766":{n:"コナミグループ",c:"JPY"},"9843":{n:"ニトリホールディングス",c:"JPY"},"9983":{n:"ファーストリテイリング",c:"JPY"},"9984":{n:"ソフトバンクグループ",c:"JPY"},
     // --- 米国 (USD) ---
-    "AAPL":{n:"Apple Inc.",c:"USD"},"MSFT":{n:"Microsoft Corporation",c:"USD"},"GOOGL":{n:"Alphabet Inc.",c:"USD"},"AMZN":{n:"Amazon.com, Inc.",c:"USD"},"NVDA":{n:"NVIDIA Corporation",c:"USD"},
-    "META":{n:"Meta Platforms, Inc.",c:"USD"},"TSLA":{n:"Tesla, Inc.",c:"USD"},"BRK.B":{n:"Berkshire Hathaway Inc.",c:"USD"},"JPM":{n:"JPMorgan Chase & Co.",c:"USD"},"V":{n:"Visa Inc.",c:"USD"},
-    "MA":{n:"Mastercard Incorporated",c:"USD"},"UNH":{n:"UnitedHealth Group",c:"USD"},"JNJ":{n:"Johnson & Johnson",c:"USD"},"WMT":{n:"Walmart Inc.",c:"USD"},"PG":{n:"Procter & Gamble",c:"USD"},
-    "HD":{n:"Home Depot, Inc.",c:"USD"},"DIS":{n:"Walt Disney Company",c:"USD"},"NFLX":{n:"Netflix, Inc.",c:"USD"},"KO":{n:"Coca-Cola Company",c:"USD"},"PEP":{n:"PepsiCo, Inc.",c:"USD"},
-    "XOM":{n:"Exxon Mobil Corporation",c:"USD"},"CVX":{n:"Chevron Corporation",c:"USD"},"BAC":{n:"Bank of America",c:"USD"},"ORCL":{n:"Oracle Corporation",c:"USD"},"CSCO":{n:"Cisco Systems",c:"USD"},
-    "INTC":{n:"Intel Corporation",c:"USD"},"AMD":{n:"Advanced Micro Devices",c:"USD"},"IBM":{n:"IBM",c:"USD"},"ADBE":{n:"Adobe Inc.",c:"USD"},"CRM":{n:"Salesforce, Inc.",c:"USD"},
-    "PYPL":{n:"PayPal Holdings",c:"USD"},"COST":{n:"Costco Wholesale",c:"USD"},"MCD":{n:"McDonald's Corporation",c:"USD"},"NKE":{n:"Nike, Inc.",c:"USD"},"SBUX":{n:"Starbucks Corporation",c:"USD"},
-    "BA":{n:"Boeing Company",c:"USD"},"GE":{n:"GE Aerospace",c:"USD"},"CAT":{n:"Caterpillar Inc.",c:"USD"},"GS":{n:"Goldman Sachs",c:"USD"},"MS":{n:"Morgan Stanley",c:"USD"},
-    "WFC":{n:"Wells Fargo",c:"USD"},"T":{n:"AT&T Inc.",c:"USD"},"VZ":{n:"Verizon Communications",c:"USD"},"PFE":{n:"Pfizer Inc.",c:"USD"},"MRK":{n:"Merck & Co.",c:"USD"},
-    "ABBV":{n:"AbbVie Inc.",c:"USD"},"LLY":{n:"Eli Lilly and Company",c:"USD"},"TXN":{n:"Texas Instruments",c:"USD"},"QCOM":{n:"Qualcomm Incorporated",c:"USD"},"AVGO":{n:"Broadcom Inc.",c:"USD"},
-    "UBER":{n:"Uber Technologies",c:"USD"},"ABNB":{n:"Airbnb, Inc.",c:"USD"},"SHOP":{n:"Shopify Inc.",c:"USD"},"SQ":{n:"Block, Inc.",c:"USD"},"SPOT":{n:"Spotify Technology",c:"USD"},
-    "PLTR":{n:"Palantir Technologies",c:"USD"},"SNOW":{n:"Snowflake Inc.",c:"USD"},"PANW":{n:"Palo Alto Networks",c:"USD"},"NOW":{n:"ServiceNow, Inc.",c:"USD"},"ISRG":{n:"Intuitive Surgical",c:"USD"},
-    "LRCX":{n:"Lam Research",c:"USD"},"AMAT":{n:"Applied Materials",c:"USD"},"MU":{n:"Micron Technology",c:"USD"},"RTX":{n:"RTX Corporation",c:"USD"},"LMT":{n:"Lockheed Martin",c:"USD"},
-    "HON":{n:"Honeywell International",c:"USD"},"UPS":{n:"United Parcel Service",c:"USD"},"LOW":{n:"Lowe's Companies",c:"USD"},"TGT":{n:"Target Corporation",c:"USD"},"F":{n:"Ford Motor Company",c:"USD"},
-    "GM":{n:"General Motors",c:"USD"},"C":{n:"Citigroup Inc.",c:"USD"},
+    "AAPL":{n:"Apple Inc.",c:"USD"}, "ABBV":{n:"AbbVie Inc.",c:"USD"}, "ABNB":{n:"Airbnb Inc.",c:"USD"}, "ADBE":{n:"Adobe Inc.",c:"USD"}, "AMAT":{n:"Applied Materials",c:"USD"}, "AMD":{n:"Advanced Micro Devices",c:"USD"}, 
+    "AMZN":{n:"Amazon.com Inc.",c:"USD"}, "AVGO":{n:"Broadcom Inc.",c:"USD"}, "BA":{n:"Boeing Company",c:"USD"}, "BAC":{n:"Bank of America",c:"USD"}, "BRK-B":{n:"Berkshire Hathaway Inc.",c:"USD"}, 
+    "C":{n:"Citigroup Inc.",c:"USD"}, "CAT":{n:"Caterpillar Inc.",c:"USD"}, "COST":{n:"Costco Wholesale",c:"USD"}, "CRM":{n:"Salesforce Inc.",c:"USD"}, "CSCO":{n:"Cisco Systems",c:"USD"}, "CVX":{n:"Chevron Corporation",c:"USD"}, 
+    "DIS":{n:"Walt Disney Company",c:"USD"}, "F":{n:"Ford Motor Company",c:"USD"}, "GE":{n:"GE Aerospace",c:"USD"}, "GM":{n:"General Motors",c:"USD"}, "GOOGL":{n:"Alphabet Inc.",c:"USD"}, "GS":{n:"Goldman Sachs",c:"USD"}, 
+    "HD":{n:"Home Depot Inc.",c:"USD"}, "HON":{n:"Honeywell International",c:"USD"}, "IBM":{n:"International Business Machines Corporation",c:"USD"}, "INTC":{n:"Intel Corporation",c:"USD"}, "ISRG":{n:"Intuitive Surgical",c:"USD"}, 
+    "JNJ":{n:"Johnson & Johnson",c:"USD"}, "JPM":{n:"JPMorgan Chase & Co.",c:"USD"}, "KO":{n:"Coca-Cola Company",c:"USD"}, "LLY":{n:"Eli Lilly and Company",c:"USD"}, "LMT":{n:"Lockheed Martin",c:"USD"}, 
+    "LOW":{n:"Lowe's Companies",c:"USD"}, "LRCX":{n:"Lam Research",c:"USD"}, "MA":{n:"Mastercard Incorporated",c:"USD"}, "MCD":{n:"McDonald's Corporation",c:"USD"}, "META":{n:"Meta Platforms Inc.",c:"USD"}, 
+    "MRK":{n:"Merck & Co.",c:"USD"}, "MS":{n:"Morgan Stanley",c:"USD"}, "MSFT":{n:"Microsoft Corporation",c:"USD"}, "MU":{n:"Micron Technology",c:"USD"}, "NFLX":{n:"Netflix Inc.",c:"USD"}, "NKE":{n:"Nike Inc.",c:"USD"}, 
+    "NOW":{n:"ServiceNow Inc.",c:"USD"}, "NVDA":{n:"NVIDIA Corporation",c:"USD"}, "ORCL":{n:"Oracle Corporation",c:"USD"}, "PANW":{n:"Palo Alto Networks",c:"USD"}, "PEP":{n:"PepsiCo Inc.",c:"USD"}, 
+    "PFE":{n:"Pfizer Inc.",c:"USD"}, "PG":{n:"Procter & Gamble",c:"USD"}, "PLTR":{n:"Palantir Technologies",c:"USD"}, "PYPL":{n:"PayPal Holdings",c:"USD"}, "QCOM":{n:"Qualcomm Incorporated",c:"USD"}, 
+    "RTX":{n:"RTX Corporation",c:"USD"}, "SBUX":{n:"Starbucks Corporation",c:"USD"}, "SHOP":{n:"Shopify Inc.",c:"USD"}, "SNOW":{n:"Snowflake Inc.",c:"USD"}, "SPCX":{n:"Space Exploration Technologies Corp.",c:"USD"}, 
+    "SPOT":{n:"Spotify Technology",c:"USD"}, "SQ":{n:"Block Inc.",c:"USD"}, "T":{n:"AT&T Inc.",c:"USD"}, "TGT":{n:"Target Corporation",c:"USD"}, "TSLA":{n:"Tesla Inc.",c:"USD"}, "TXN":{n:"Texas Instruments",c:"USD"}, 
+    "UBER":{n:"Uber Technologies",c:"USD"}, "UNH":{n:"UnitedHealth Group",c:"USD"}, "UPS":{n:"United Parcel Service",c:"USD"}, "V":{n:"Visa Inc.",c:"USD"}, "VZ":{n:"Verizon Communications",c:"USD"}, 
+    "WFC":{n:"Wells Fargo",c:"USD"}, "WMT":{n:"Walmart Inc.",c:"USD"}, "XOM":{n:"Exxon Mobil Corporation",c:"USD"},
     // --- スイス (CHF, SMI主要銘柄) ---
     "NESN":{n:"Nestlé S.A.",c:"CHF"},"NOVN":{n:"Novartis AG",c:"CHF"},"ROG":{n:"Roche Holding AG",c:"CHF"},"UBSG":{n:"UBS Group AG",c:"CHF"},"ZURN":{n:"Zurich Insurance Group",c:"CHF"},
     "ABBN":{n:"ABB Ltd",c:"CHF"},"CFR":{n:"Compagnie Financière Richemont",c:"CHF"},"HOLN":{n:"Holcim Ltd",c:"CHF"},"LONN":{n:"Lonza Group AG",c:"CHF"},"SREN":{n:"Swiss Re AG",c:"CHF"},
@@ -966,6 +990,7 @@
 
       const history = (s.priceHistory || []).slice().sort((a,b)=> a.date.localeCompare(b.date));
       const sparkHtml = renderSparkRow(history, s.currency);
+      const fundHtml = renderFundRow(s);
       const ccy = s.currency || 'JPY';
 
       return `
@@ -978,6 +1003,7 @@
           <div class="badges">${badgeHtml}</div>
           ${newsHtml ? `<div class="news">${newsHtml}</div>` : ''}
           ${sparkHtml}
+          ${fundHtml}
         </div>
         <div class="col">
           <div class="l">保有</div>
@@ -998,6 +1024,16 @@
         </div>
       </div>`;
     }).join('');
+  }
+
+  function renderFundRow(s){
+    const chips = [];
+    if(s.per !== null && s.per !== undefined && s.per !== '') chips.push(`<span class="fund-chip">PER<b>${s.per}倍</b></span>`);
+    if(s.pbr !== null && s.pbr !== undefined && s.pbr !== '') chips.push(`<span class="fund-chip">PBR<b>${s.pbr}倍</b></span>`);
+    if(s.dividendYield !== null && s.dividendYield !== undefined && s.dividendYield !== '') chips.push(`<span class="fund-chip">配当利回り<b>${s.dividendYield}%</b></span>`);
+    if(s.roe !== null && s.roe !== undefined && s.roe !== '') chips.push(`<span class="fund-chip">ROE<b>${s.roe}%</b></span>`);
+    if(chips.length === 0) return '';
+    return `<div class="fund-row">${chips.join('')}</div>`;
   }
 
   function renderSparkRow(history, currency){
@@ -1132,11 +1168,10 @@
       document.getElementById('fCost').value = s.cost ?? '';
       document.getElementById('fBuyTarget').value = s.buyTarget ?? '';
       document.getElementById('fSellTarget').value = s.sellTarget ?? '';
-      const n = s.news || [];
-      document.getElementById('fNews1Title').value = n[0]?.title || '';
-      document.getElementById('fNews1Url').value = n[0]?.url || '';
-      document.getElementById('fNews2Title').value = n[1]?.title || '';
-      document.getElementById('fNews2Url').value = n[1]?.url || '';
+      document.getElementById('fPER').value = s.per ?? '';
+      document.getElementById('fPBR').value = s.pbr ?? '';
+      document.getElementById('fDivYield').value = s.dividendYield ?? '';
+      document.getElementById('fROE').value = s.roe ?? '';
       overlay.classList.add('show');
     }
 
@@ -1170,6 +1205,10 @@
       cost: document.getElementById('fCost').value === '' ? null : Number(document.getElementById('fCost').value),
       buyTarget: document.getElementById('fBuyTarget').value === '' ? null : Number(document.getElementById('fBuyTarget').value),
       sellTarget: document.getElementById('fSellTarget').value === '' ? null : Number(document.getElementById('fSellTarget').value),
+      per: document.getElementById('fPER').value === '' ? null : Number(document.getElementById('fPER').value),
+      pbr: document.getElementById('fPBR').value === '' ? null : Number(document.getElementById('fPBR').value),
+      dividendYield: document.getElementById('fDivYield').value === '' ? null : Number(document.getElementById('fDivYield').value),
+      roe: document.getElementById('fROE').value === '' ? null : Number(document.getElementById('fROE').value),
       news
     };
 
