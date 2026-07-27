@@ -171,12 +171,32 @@
   }
   .empty b{ color:var(--text); display:block; font-size:13.5px; margin-bottom:4px; }
 
-  .card{
+  .card-row{ display:flex; align-items:stretch; gap:8px; }
+
+  .drag-handle{
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+    width:22px; flex-shrink:0; cursor:grab; touch-action:none; border-radius:6px;
+    color:var(--muted-2); background:var(--panel); border:1px solid var(--line); user-select:none;
+  }
+  .drag-handle span{ width:12px; height:1.5px; background:currentColor; border-radius:1px; }
+  .drag-handle:hover{ color:var(--text); border-color:#444; }
+  .drag-handle:active{ cursor:grabbing; }
+  .drag-handle.disabled{ opacity:.3; cursor:not-allowed; }
+
+  .drag-ghost{
+    position:fixed; z-index:200; pointer-events:none; box-shadow:0 10px 30px rgba(0,0,0,.5);
+    border-radius:8px; opacity:.96;
+  }
+  .card-row.dragging > .card-body{ opacity:.35; }
+  .card-row.dragging > .drag-handle{ color:var(--red); border-color:var(--red-dim); }
+  .drop-indicator{ height:3px; background:var(--red); border-radius:2px; margin:1px 0; box-shadow:0 0 6px rgba(255,59,48,.6); }
+
+  .card-body{
     background:var(--panel); border:1px solid var(--line); border-radius:8px;
     padding:16px 18px; display:grid; grid-template-columns: 1.4fr 1fr 1fr 1fr auto;
-    gap:14px; align-items:center; transition:.15s;
+    gap:14px; align-items:center; transition:.15s; flex:1; min-width:0;
   }
-  .card:hover{ border-color:#3a3b3c; }
+  .card-body:hover{ border-color:#3a3b3c; }
 
   .col-name{ min-width:0; }
   .name-row{ display:flex; align-items:center; gap:8px; margin-bottom:4px; }
@@ -258,10 +278,10 @@
   .iconbtn.del:hover{ color:var(--red); border-color:var(--red-dim); }
 
   @media (max-width: 860px){
-    .card{ grid-template-columns: 1fr 1fr; grid-template-areas: "name name" "a b" "c d" "actions actions"; }
+    .card-body{ grid-template-columns: 1fr 1fr; grid-template-areas: "name name" "a b" "c d" "actions actions"; }
   }
   @media (max-width: 560px){
-    .card{ grid-template-columns: 1fr 1fr; }
+    .card-body{ grid-template-columns: 1fr 1fr; }
     header{ flex-direction:column; }
     .stats{ width:100%; justify-content:space-between; }
   }
@@ -995,7 +1015,11 @@
       const ccy = s.currency || 'JPY';
 
       return `
-      <div class="card" data-id="${s.id}">
+      <div class="card-row" data-id="${s.id}">
+        <div class="drag-handle ${currentSort === 'added' ? '' : 'disabled'}" title="ドラッグして並び替え">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="card-body">
         <div class="col-name">
           <div class="name-row">
             <span class="name">${esc(s.name)}</span>
@@ -1022,6 +1046,7 @@
           <button class="iconbtn chart" title="値動きグラフ">📈</button>
           <button class="iconbtn edit" title="編集">✎</button>
           <button class="iconbtn del" title="削除">🗑</button>
+        </div>
         </div>
       </div>`;
     }).join('');
@@ -1153,7 +1178,7 @@
 
   // ---- edit / delete via delegation ----
   list.addEventListener('click', (e)=>{
-    const card = e.target.closest('.card');
+    const card = e.target.closest('.card-row');
     if(!card) return;
     const id = card.dataset.id;
     const s = stocks.find(x => x.id === id);
@@ -1394,11 +1419,104 @@
   }
 
   list.addEventListener('click', (e)=>{
-    const card = e.target.closest('.card');
+    const card = e.target.closest('.card-row');
     if(!card) return;
     if(e.target.closest('.chart')){
       openChart(card.dataset.id);
     }
+  });
+
+  // ---- manual drag reorder ----
+  function applyNewOrder(visualIdsInOrder){
+    const underlyingOrder = currentSortDir === 'desc' ? visualIdsInOrder.slice().reverse() : visualIdsInOrder.slice();
+    const idSet = new Set(underlyingOrder);
+    const positions = [];
+    stocks.forEach((s,i) => { if(idSet.has(s.id)) positions.push(i); });
+    const byId = {};
+    stocks.forEach(s => { byId[s.id] = s; });
+    const newStocks = stocks.slice();
+    positions.forEach((pos, i) => { newStocks[pos] = byId[underlyingOrder[i]]; });
+    stocks = newStocks;
+  }
+
+  list.addEventListener('pointerdown', (e)=>{
+    const handle = e.target.closest('.drag-handle');
+    if(!handle) return;
+    if(currentSort !== 'added'){
+      toast('並び替え項目を「追加順」にすると、ドラッグで並び替えできます');
+      return;
+    }
+    const cardRow = handle.closest('.card-row');
+    if(!cardRow) return;
+    e.preventDefault();
+
+    const rect = cardRow.getBoundingClientRect();
+    const offsetY = e.clientY - rect.top;
+
+    const ghost = cardRow.cloneNode(true);
+    ghost.classList.add('drag-ghost');
+    ghost.style.width = rect.width + 'px';
+    ghost.style.left = rect.left + 'px';
+    ghost.style.top = rect.top + 'px';
+    document.body.appendChild(ghost);
+
+    cardRow.classList.add('dragging');
+
+    const indicator = document.createElement('div');
+    indicator.className = 'drop-indicator';
+    cardRow.after(indicator);
+
+    let hoverTarget = null, hoverBefore = false;
+
+    function autoScroll(y){
+      const margin = 70;
+      if(y < margin) window.scrollBy(0, -14);
+      else if(y > window.innerHeight - margin) window.scrollBy(0, 14);
+    }
+
+    function onMove(ev){
+      const y = ev.clientY;
+      ghost.style.transform = `translateY(${y - rect.top - offsetY}px)`;
+      autoScroll(y);
+
+      const rows = Array.from(list.querySelectorAll('.card-row')).filter(r => r !== cardRow);
+      let target = null, before = false;
+      for(const r of rows){
+        const rc = r.getBoundingClientRect();
+        const mid = rc.top + rc.height/2;
+        if(y < mid){ target = r; before = true; break; }
+      }
+      if(!target && rows.length){ target = rows[rows.length-1]; before = false; }
+
+      hoverTarget = target; hoverBefore = before;
+      if(target){
+        if(before) target.before(indicator);
+        else target.after(indicator);
+      }
+    }
+
+    function onUp(){
+      document.removeEventListener('pointermove', onMove);
+      ghost.remove();
+      indicator.remove();
+      cardRow.classList.remove('dragging');
+
+      const rows = Array.from(list.querySelectorAll('.card-row')).filter(r => r !== cardRow);
+      const ids = rows.map(r => r.dataset.id);
+      let insertIdx = ids.length;
+      if(hoverTarget){
+        const idx = ids.indexOf(hoverTarget.dataset.id);
+        insertIdx = idx === -1 ? ids.length : (hoverBefore ? idx : idx + 1);
+      }
+      ids.splice(insertIdx, 0, cardRow.dataset.id);
+
+      applyNewOrder(ids);
+      persist();
+      render();
+    }
+
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp, { once:true });
   });
 
   historyListDelegate();
