@@ -245,7 +245,7 @@
   }
   .seg-btn:hover{ color:var(--text); }
   .seg-btn.active{ background:var(--red); color:#fff; }
-  .chart-wrap{ background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:14px 10px 6px; margin-bottom:16px; }
+  .chart-wrap{ background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:14px 10px 6px; margin-bottom:16px; position:relative; }
   .chart-legend{ display:flex; gap:14px; flex-wrap:wrap; margin-bottom:10px; font-size:10px; color:var(--muted); }
   .chart-legend span{ display:inline-flex; align-items:center; gap:5px; }
   .chart-legend i{ width:10px; height:2px; display:inline-block; }
@@ -1286,6 +1286,9 @@
   let chartGranularity = 'daily';
   let chartRange = 'ALL';
   let currentChartId = null;
+  let chartPoints = [];
+  let chartCurrency = 'JPY';
+  const CHART_W = 580, CHART_H = 220;
 
   function filterByRange(history, range){
     if(range === 'ALL' || history.length === 0) return history;
@@ -1375,10 +1378,13 @@
     legend.innerHTML = legendItems.join('');
 
     // chart svg
-    const W = 580, H = 220, padL = 62, padR = 14, padT = 14, padB = 26;
+    const W = CHART_W, H = CHART_H, padL = 62, padR = 14, padT = 14, padB = 26;
+    chartCurrency = ccy;
     if(rawHistory.length === 0){
+      chartPoints = [];
       wrap.innerHTML = `<div class="history-empty" style="padding:40px 0;">まだ価格記録がありません。下のフォームから最初の1件を追加してください。</div>`;
     } else if(history.length === 0){
+      chartPoints = [];
       wrap.innerHTML = `<div class="history-empty" style="padding:40px 0;">選択した期間に一致する記録がありません。期間を変更してみてください。</div>`;
     } else {
       const prices = history.map(e => Number(e.price));
@@ -1418,8 +1424,10 @@
       // dots
       const dots = history.map((e,i) => `<circle cx="${xFor(i).toFixed(1)}" cy="${yFor(Number(e.price)).toFixed(1)}" r="2.5" fill="var(--red)"/>`).join('');
 
+      chartPoints = history.map((e,i) => ({ date: e.date, price: Number(e.price), x: xFor(i), y: yFor(Number(e.price)) }));
+
       wrap.innerHTML = `
-        <svg width="100%" viewBox="0 0 ${W} ${H}" style="overflow:visible;">
+        <svg width="100%" viewBox="0 0 ${W} ${H}" style="overflow:visible; touch-action:none;">
           ${gridSvg}
           ${refLine(s.cost, 'var(--muted-2)')}
           ${refLine(s.buyTarget, '#e8b04b')}
@@ -1428,7 +1436,10 @@
           ${dots}
           <text x="${padL}" y="${H-6}" font-size="9.5" fill="var(--muted-2)" font-family="IBM Plex Mono, monospace">${firstDate}</text>
           <text x="${W-padR}" y="${H-6}" text-anchor="end" font-size="9.5" fill="var(--muted-2)" font-family="IBM Plex Mono, monospace">${lastDate}</text>
-        </svg>`;
+          <line id="crossLine" x1="0" y1="${padT}" x2="0" y2="${H-padB}" stroke="var(--text)" stroke-width="1" stroke-dasharray="3,3" opacity="0"/>
+          <circle id="crossDot" cx="0" cy="0" r="4" fill="#fff" stroke="var(--red)" stroke-width="2" opacity="0"/>
+        </svg>
+        <div id="chartTooltip" style="position:absolute; display:none; background:var(--panel-2); border:1px solid var(--line); border-radius:6px; padding:7px 10px; font-size:11px; color:var(--text); pointer-events:none; white-space:nowrap; z-index:10; box-shadow:0 4px 14px rgba(0,0,0,.5);"></div>`;
     }
 
     // history list (always shows the raw, unaggregated records for editing)
@@ -1443,6 +1454,78 @@
         </div>`).join('');
     }
   }
+
+  // ---- chart scrubbing (touch/drag crosshair) ----
+  (function(){
+    const wrap = document.getElementById('chartWrap');
+    let scrubbing = false;
+
+    function updateCrosshair(clientX){
+      if(chartPoints.length === 0) return;
+      const svg = wrap.querySelector('svg');
+      const tooltip = document.getElementById('chartTooltip');
+      const crossLine = document.getElementById('crossLine');
+      const crossDot = document.getElementById('crossDot');
+      if(!svg || !tooltip || !crossLine || !crossDot) return;
+
+      const svgRect = svg.getBoundingClientRect();
+      const scale = svgRect.width / CHART_W;
+      const svgX = (clientX - svgRect.left) / scale;
+
+      let nearest = chartPoints[0], minDist = Infinity;
+      for(const p of chartPoints){
+        const d = Math.abs(p.x - svgX);
+        if(d < minDist){ minDist = d; nearest = p; }
+      }
+
+      crossLine.setAttribute('x1', nearest.x); crossLine.setAttribute('x2', nearest.x); crossLine.setAttribute('opacity','1');
+      crossDot.setAttribute('cx', nearest.x); crossDot.setAttribute('cy', nearest.y); crossDot.setAttribute('opacity','1');
+
+      tooltip.innerHTML = `<div style="color:var(--muted);font-size:9.5px;margin-bottom:2px;">${esc(nearest.date)}</div><div style="font-weight:600;">${fmt(nearest.price, chartCurrency)}</div>`;
+      tooltip.style.display = 'block';
+
+      const wrapRect = wrap.getBoundingClientRect();
+      const pointLeft = (svgRect.left - wrapRect.left) + nearest.x * scale;
+      const pointTop = (svgRect.top - wrapRect.top) + nearest.y * scale;
+      const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
+      let tLeft = pointLeft - tw/2;
+      let tTop = pointTop - th - 12;
+      if(tLeft < 4) tLeft = 4;
+      if(tLeft + tw > wrap.clientWidth - 4) tLeft = wrap.clientWidth - 4 - tw;
+      if(tTop < 4) tTop = pointTop + 14;
+      tooltip.style.left = tLeft + 'px';
+      tooltip.style.top = tTop + 'px';
+    }
+
+    function hideCrosshair(){
+      const crossLine = document.getElementById('crossLine');
+      const crossDot = document.getElementById('crossDot');
+      const tooltip = document.getElementById('chartTooltip');
+      if(crossLine) crossLine.setAttribute('opacity','0');
+      if(crossDot) crossDot.setAttribute('opacity','0');
+      if(tooltip) tooltip.style.display = 'none';
+    }
+
+    function endScrub(){
+      if(!scrubbing) return;
+      scrubbing = false;
+      hideCrosshair();
+    }
+
+    wrap.addEventListener('pointerdown', (e)=>{
+      if(chartPoints.length === 0) return;
+      scrubbing = true;
+      try{ wrap.setPointerCapture(e.pointerId); }catch(err){}
+      updateCrosshair(e.clientX);
+    });
+    wrap.addEventListener('pointermove', (e)=>{
+      if(!scrubbing) return;
+      updateCrosshair(e.clientX);
+    });
+    wrap.addEventListener('pointerup', endScrub);
+    wrap.addEventListener('pointercancel', endScrub);
+    wrap.addEventListener('pointerleave', endScrub);
+  })();
 
   list.addEventListener('click', (e)=>{
     const card = e.target.closest('.card-row');
