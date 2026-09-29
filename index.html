@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>STOCK LEDGER</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Stock Ledger">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -335,6 +343,8 @@
     background-repeat:no-repeat; background-position: right 12px center;
   }
   .field select:focus{ border-color:var(--red); }
+  .field textarea:focus{ border-color:var(--red); }
+  .field textarea::placeholder{ color:var(--muted-2); }
   .row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   .hint{ color:var(--muted-2); font-size:10px; margin-top:5px; line-height:1.5; }
   .divider{ border-top:1px dashed var(--line); margin:18px 0 14px; padding-top:2px; }
@@ -357,6 +367,42 @@
     letter-spacing:.03em;
   }
   .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  .toolbar{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+  .toolbar-btn{
+    background:var(--panel); border:1px solid var(--line); color:var(--text); font-family:inherit;
+    font-size:11.5px; letter-spacing:.02em; padding:8px 13px; border-radius:6px; cursor:pointer;
+    transition:.15s; display:inline-flex; align-items:center; gap:6px;
+  }
+  .toolbar-btn:hover{ border-color:#444; background:var(--panel-2); }
+
+  /* ---------- portfolio summary ---------- */
+  .summary-block{ margin-bottom:22px; }
+  .summary-block h3{ font-size:12px; letter-spacing:.06em; color:var(--muted); margin-bottom:12px; text-transform:uppercase; }
+  .summary-grid{ display:flex; gap:24px; flex-wrap:wrap; align-items:center; }
+  .summary-stats{ display:flex; gap:22px; flex-wrap:wrap; }
+  .summary-stat .n{ font-size:19px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .summary-stat .l{ color:var(--muted-2); font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; margin-top:2px; }
+  .summary-stat .n.green{ color:var(--green); }
+  .summary-stat .n.red{ color:var(--red); }
+  .summary-legend{ display:flex; flex-direction:column; gap:6px; font-size:11px; }
+  .summary-legend .row{ display:flex; align-items:center; gap:7px; }
+  .summary-legend .sw{ width:9px; height:9px; border-radius:2px; flex-shrink:0; }
+  .summary-legend .nm{ color:var(--text); }
+  .summary-legend .pc{ color:var(--muted); margin-left:auto; font-variant-numeric:tabular-nums; }
+  .summary-empty{ color:var(--muted-2); font-size:12px; text-align:center; padding:24px 0; }
+
+  /* ---------- bulk update ---------- */
+  .bulk-list{ max-height:340px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; margin-bottom:6px; }
+  .bulk-row{ display:flex; align-items:center; gap:10px; padding:8px 2px; border-bottom:1px dashed var(--line-soft); }
+  .bulk-row .bn{ flex:1; min-width:0; font-size:12.5px; }
+  .bulk-row .bn .code{ color:var(--muted); font-size:10.5px; margin-left:6px; }
+  .bulk-row .bp{ color:var(--muted-2); font-size:10.5px; width:80px; flex-shrink:0; }
+  .bulk-row input{
+    width:110px; background:var(--bg); border:1px solid var(--line); color:var(--text);
+    font-family:inherit; font-size:12.5px; padding:7px 9px; border-radius:5px; outline:none;
+  }
+  .bulk-row input:focus{ border-color:var(--red); }
 </style>
 </head>
 <body>
@@ -388,6 +434,14 @@
       <button type="button" class="acc-btn" id="openAccountSettings">アカウント設定</button>
       <button type="button" class="acc-btn" id="logoutBtn">ログアウト</button>
     </div>
+  </div>
+
+  <div class="toolbar">
+    <button type="button" class="toolbar-btn" id="openSummary">📊 ポートフォリオ概要</button>
+    <button type="button" class="toolbar-btn" id="openBulkUpdate">📥 価格を一括更新</button>
+    <button type="button" class="toolbar-btn" id="exportBtn">⬇️ バックアップ書き出し</button>
+    <button type="button" class="toolbar-btn" id="importBtn">⬆️ バックアップ読み込み</button>
+    <input type="file" id="importFileInput" accept="application/json" style="display:none;">
   </div>
 
   <div class="controls">
@@ -528,6 +582,12 @@
         <input type="url" id="fNews2Url" placeholder="https://...">
       </div>
 
+      <div class="divider"><span>投資メモ</span></div>
+      <div class="field">
+        <label>買った理由・売る条件など</label>
+        <textarea id="fMemo" placeholder="例: 増収増益トレンドが続く限り保有。PER20倍を超えたら利確を検討。" style="width:100%; background:var(--bg); border:1px solid var(--line); color:var(--text); font-family:inherit; font-size:13px; padding:9px 10px; border-radius:5px; outline:none; resize:vertical; min-height:56px;"></textarea>
+      </div>
+
       <div class="modal-actions">
         <button type="button" class="btn" id="cancelBtn">キャンセル</button>
         <button type="submit" class="btn primary" id="saveBtn">保存</button>
@@ -649,6 +709,29 @@
         <button type="submit" class="btn" id="deleteAccountBtn" style="background:var(--red); border-color:var(--red); color:#fff;">アカウントを削除</button>
       </div>
     </form>
+  </div>
+</div>
+
+<div class="overlay" id="summaryOverlay">
+  <div class="modal wide">
+    <h2><span>ポートフォリオ概要</span><span class="x" id="closeSummary">×</span></h2>
+    <div id="summaryContent"></div>
+  </div>
+</div>
+
+<div class="overlay" id="bulkOverlay">
+  <div class="modal wide">
+    <h2><span>価格を一括更新</span><span class="x" id="closeBulk">×</span></h2>
+    <div class="field">
+      <label>基準日</label>
+      <input type="date" id="bulkDate" required>
+    </div>
+    <p class="hint" style="margin-top:0;">価格を入力した銘柄だけがこの日付で記録されます。空欄の銘柄はスキップされます。</p>
+    <div class="bulk-list" id="bulkList"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="bulkCancel">キャンセル</button>
+      <button type="button" class="btn primary" id="bulkSaveBtn">一括保存</button>
+    </div>
   </div>
 </div>
 
@@ -825,7 +908,10 @@
     if(n === null || n === undefined || n === '') return '—';
     const sym = CCY_SYMBOL[currency] || '¥';
     const locale = currency === 'USD' ? 'en-US' : currency === 'CHF' ? 'de-CH' : 'ja-JP';
-    return sym + Number(n).toLocaleString(locale, {maximumFractionDigits:2});
+    const num = Number(n);
+    const neg = num < 0;
+    const body = Math.abs(num).toLocaleString(locale, {maximumFractionDigits:2});
+    return (neg ? '-' : '') + sym + body;
   }
 
   function classify(s){
@@ -1038,6 +1124,9 @@
       const history = (s.priceHistory || []).slice().sort((a,b)=> a.date.localeCompare(b.date));
       const sparkHtml = renderSparkRow(history, s.currency);
       const fundHtml = renderFundRow(s);
+      const pnlHtml = renderPnLRow(s);
+      const targetHtml = renderTargetRow(s);
+      const memoHtml = renderMemoRow(s);
       const ccy = s.currency || 'JPY';
 
       return `
@@ -1054,7 +1143,10 @@
           <div class="badges">${badgeHtml}</div>
           ${newsHtml ? `<div class="news">${newsHtml}</div>` : ''}
           ${sparkHtml}
+          ${pnlHtml}
           ${fundHtml}
+          ${targetHtml}
+          ${memoHtml}
         </div>
         <div class="col">
           <div class="l">保有</div>
@@ -1076,6 +1168,51 @@
         </div>
       </div>`;
     }).join('');
+  }
+
+  function renderPnLRow(s){
+    const latest = getLatestPrice(s);
+    const shares = Number(s.shares) || 0;
+    if(shares <= 0 || s.cost === null || s.cost === undefined || s.cost === '' || latest === null) return '';
+    const cost = Number(s.cost);
+    const diffPerShare = latest - cost;
+    const totalPnl = diffPerShare * shares;
+    const pct = cost !== 0 ? (diffPerShare / cost * 100) : 0;
+    const cls = totalPnl >= 0 ? 'up' : 'down';
+    const sign = totalPnl >= 0 ? '+' : '';
+    return `<div class="spark-row"><span class="spark-delta ${cls}" style="font-size:11px;">含み損益 ${sign}${fmt(totalPnl, s.currency)} (${sign}${pct.toFixed(1)}%)</span></div>`;
+  }
+
+  function renderTargetRow(s){
+    const latest = getLatestPrice(s);
+    if(latest === null) return '';
+    const chips = [];
+    if(s.buyTarget !== null && s.buyTarget !== undefined && s.buyTarget !== ''){
+      const bt = Number(s.buyTarget);
+      if(latest <= bt){
+        chips.push(`<span class="fund-chip" style="color:var(--green);border-color:var(--green-dim);">🎯 買い目標に到達</span>`);
+      } else {
+        const diffPct = bt !== 0 ? ((latest - bt)/bt*100) : 0;
+        chips.push(`<span class="fund-chip">買い目標まで<b>${diffPct >= 0 ? '+' : ''}${diffPct.toFixed(1)}%</b></span>`);
+      }
+    }
+    if(s.sellTarget !== null && s.sellTarget !== undefined && s.sellTarget !== ''){
+      const st = Number(s.sellTarget);
+      if(latest >= st){
+        chips.push(`<span class="fund-chip" style="color:var(--red);border-color:var(--red-dim);">🎯 売り目標に到達</span>`);
+      } else {
+        const diffPct = st !== 0 ? ((latest - st)/st*100) : 0;
+        chips.push(`<span class="fund-chip">売り目標まで<b>${diffPct >= 0 ? '+' : ''}${diffPct.toFixed(1)}%</b></span>`);
+      }
+    }
+    if(chips.length === 0) return '';
+    return `<div class="fund-row">${chips.join('')}</div>`;
+  }
+
+  function renderMemoRow(s){
+    if(!s.memo || !s.memo.trim()) return '';
+    const preview = s.memo.length > 50 ? s.memo.slice(0,50) + '…' : s.memo;
+    return `<div class="news" title="${escAttr(s.memo)}">📝 ${esc(preview)}</div>`;
   }
 
   function renderFundRow(s){
@@ -1224,6 +1361,7 @@
       document.getElementById('fPBR').value = s.pbr ?? '';
       document.getElementById('fDivYield').value = s.dividendYield ?? '';
       document.getElementById('fROE').value = s.roe ?? '';
+      document.getElementById('fMemo').value = s.memo || '';
       overlay.classList.add('show');
     }
 
@@ -1261,6 +1399,7 @@
       pbr: document.getElementById('fPBR').value === '' ? null : Number(document.getElementById('fPBR').value),
       dividendYield: document.getElementById('fDivYield').value === '' ? null : Number(document.getElementById('fDivYield').value),
       roe: document.getElementById('fROE').value === '' ? null : Number(document.getElementById('fROE').value),
+      memo: document.getElementById('fMemo').value.trim(),
       news
     };
 
@@ -1903,6 +2042,193 @@ deleteAccountForm.addEventListener('submit', async (e)=>{
     });
   } else {
     updateAccountBar();
+  }
+
+  // ---- バックアップ書き出し・読み込み ----
+  document.getElementById('exportBtn').addEventListener('click', ()=>{
+    const data = { exportedAt: new Date().toISOString(), stocks };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `stock-ledger-backup-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast('バックアップを書き出しました');
+  });
+
+  document.getElementById('importBtn').addEventListener('click', ()=>{
+    document.getElementById('importFileInput').click();
+  });
+  document.getElementById('importFileInput').addEventListener('change', async (e)=>{
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    try{
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const importedStocks = Array.isArray(parsed) ? parsed : (parsed && Array.isArray(parsed.stocks) ? parsed.stocks : null);
+      if(!importedStocks){ toast('正しいバックアップファイルではありません'); return; }
+      if(!confirm(`${importedStocks.length}件の銘柄データを読み込みます。現在のデータは上書きされます。よろしいですか？`)) return;
+      stocks = importedStocks;
+      persist();
+      render();
+      toast('バックアップを読み込みました');
+    }catch(err){
+      toast('ファイルの読み込みに失敗しました');
+    }finally{
+      e.target.value = '';
+    }
+  });
+
+  // ---- 価格の一括更新 ----
+  const bulkOverlay = document.getElementById('bulkOverlay');
+  function openBulk(){
+    document.getElementById('bulkDate').value = new Date().toISOString().slice(0,10);
+    renderBulkList();
+    bulkOverlay.classList.add('show');
+  }
+  function closeBulk(){ bulkOverlay.classList.remove('show'); }
+  document.getElementById('openBulkUpdate').addEventListener('click', openBulk);
+  document.getElementById('closeBulk').addEventListener('click', closeBulk);
+  document.getElementById('bulkCancel').addEventListener('click', closeBulk);
+  bulkOverlay.addEventListener('click', (e)=>{ if(e.target === bulkOverlay) closeBulk(); });
+
+  function renderBulkList(){
+    const listEl = document.getElementById('bulkList');
+    if(stocks.length === 0){
+      listEl.innerHTML = `<div class="history-empty">登録されている銘柄がありません。</div>`;
+      return;
+    }
+    listEl.innerHTML = stocks.map(s => {
+      const latest = getLatestPrice(s);
+      return `
+        <div class="bulk-row" data-id="${s.id}">
+          <div class="bn">${esc(s.name)}<span class="code">${esc(s.code||'')}</span></div>
+          <div class="bp">前回: ${fmt(latest, s.currency)}</div>
+          <input type="number" step="0.01" min="0" class="bulk-price-input" placeholder="新しい株価">
+        </div>`;
+    }).join('');
+  }
+
+  document.getElementById('bulkSaveBtn').addEventListener('click', ()=>{
+    const date = document.getElementById('bulkDate').value;
+    if(!date){ toast('基準日を入力してください'); return; }
+    const rows = document.querySelectorAll('#bulkList .bulk-row');
+    let count = 0;
+    rows.forEach(row => {
+      const input = row.querySelector('.bulk-price-input');
+      const val = input.value.trim();
+      if(val === '') return;
+      const price = Number(val);
+      if(!isFinite(price)) return;
+      const s = stocks.find(x => x.id === row.dataset.id);
+      if(!s) return;
+      s.priceHistory = s.priceHistory || [];
+      const idx = s.priceHistory.findIndex(p => p.date === date);
+      if(idx > -1) s.priceHistory[idx].price = price;
+      else s.priceHistory.push({ date, price });
+      count++;
+    });
+    if(count === 0){ toast('価格が入力された銘柄がありません'); return; }
+    persist();
+    render();
+    closeBulk();
+    toast(`${count}件の価格を記録しました`);
+  });
+
+  // ---- ポートフォリオ概要 ----
+  const summaryOverlay = document.getElementById('summaryOverlay');
+  const PALETTE = ['#ff3b30','#e8b04b','#3ddc84','#5b8def','#b06de8','#ff8c42','#4fd3c4','#e85d9e','#9aa0a6','#c9a84c'];
+
+  document.getElementById('openSummary').addEventListener('click', ()=>{
+    renderSummary();
+    summaryOverlay.classList.add('show');
+  });
+  document.getElementById('closeSummary').addEventListener('click', ()=> summaryOverlay.classList.remove('show'));
+  summaryOverlay.addEventListener('click', (e)=>{ if(e.target === summaryOverlay) summaryOverlay.classList.remove('show'); });
+
+  function donutSvg(segments, size){
+    const total = segments.reduce((sum,seg)=> sum + seg.value, 0);
+    if(total <= 0) return '';
+    const r = size/2 - 7, cx = size/2, cy = size/2, circ = 2*Math.PI*r;
+    let offset = 0;
+    const circles = segments.map(seg => {
+      const frac = seg.value/total;
+      const dash = frac*circ;
+      const gap = circ - dash;
+      const circle = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${seg.color}" stroke-width="14" stroke-dasharray="${dash.toFixed(1)} ${gap.toFixed(1)}" stroke-dashoffset="${(-offset).toFixed(1)}" transform="rotate(-90 ${cx} ${cy})"/>`;
+      offset += dash;
+      return circle;
+    }).join('');
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${circles}</svg>`;
+  }
+
+  function renderSummary(){
+    const el = document.getElementById('summaryContent');
+    const holdings = stocks.filter(s => (Number(s.shares)||0) > 0);
+    if(holdings.length === 0){
+      el.innerHTML = `<div class="summary-empty">保有中の銘柄がありません。保有株数を入力すると、ここに評価額と構成比が表示されます。</div>`;
+      return;
+    }
+    const byCurrency = {};
+    holdings.forEach(s => {
+      const ccy = s.currency || 'JPY';
+      (byCurrency[ccy] = byCurrency[ccy] || []).push(s);
+    });
+
+    let html = '';
+    Object.keys(byCurrency).sort().forEach(ccy => {
+      const list = byCurrency[ccy];
+      let totalValue = 0, totalCost = 0, hasCost = false;
+      const items = [];
+      list.forEach(s => {
+        const latest = getLatestPrice(s);
+        const shares = Number(s.shares) || 0;
+        const value = latest !== null ? latest*shares : null;
+        if(value !== null) totalValue += value;
+        if(s.cost !== null && s.cost !== undefined && s.cost !== ''){
+          totalCost += Number(s.cost)*shares;
+          hasCost = true;
+        }
+        items.push({ name: s.name, value });
+      });
+      const pnl = hasCost ? (totalValue - totalCost) : null;
+      const pnlPct = (hasCost && totalCost > 0) ? (pnl/totalCost*100) : null;
+
+      const segments = items.filter(i => i.value !== null && i.value > 0)
+        .sort((a,b) => b.value - a.value)
+        .map((it, idx) => ({ label: it.name, value: it.value, color: PALETTE[idx % PALETTE.length] }));
+      const donut = donutSvg(segments, 132);
+      const legend = segments.map(seg => {
+        const pct = totalValue > 0 ? (seg.value/totalValue*100) : 0;
+        return `<div class="row"><span class="sw" style="background:${seg.color}"></span><span class="nm">${esc(seg.label)}</span><span class="pc">${pct.toFixed(1)}%</span></div>`;
+      }).join('');
+
+      html += `
+        <div class="summary-block">
+          <h3>${esc(ccy)}</h3>
+          <div class="summary-stats" style="margin-bottom:16px;">
+            <div class="summary-stat"><div class="n">${fmt(totalValue, ccy)}</div><div class="l">評価額合計</div></div>
+            ${pnl !== null ? `<div class="summary-stat"><div class="n ${pnl>=0?'green':'red'}">${pnl>=0?'+':''}${fmt(pnl, ccy)}</div><div class="l">含み損益</div></div>` : ''}
+            ${pnlPct !== null ? `<div class="summary-stat"><div class="n ${pnlPct>=0?'green':'red'}">${pnlPct>=0?'+':''}${pnlPct.toFixed(1)}%</div><div class="l">損益率</div></div>` : ''}
+          </div>
+          <div class="summary-grid">
+            ${donut || '<div class="summary-empty" style="padding:10px 0;">価格記録がまだありません</div>'}
+            <div class="summary-legend">${legend}</div>
+          </div>
+        </div>`;
+    });
+
+    el.innerHTML = html;
+  }
+
+  // ---- PWA: サービスワーカー登録 ----
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('sw.js').catch(()=>{ /* ignore if sw.js not hosted alongside */ });
+    });
   }
 
   load();
