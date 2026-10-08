@@ -266,6 +266,11 @@
   .addprice-row button:hover{ background:#e0342b; }
   .history-list{ max-height:180px; overflow-y:auto; border-top:1px dashed var(--line); }
 
+  .ohlc-details{ margin-bottom:14px; }
+  .ohlc-details summary{ color:var(--muted); font-size:11px; cursor:pointer; letter-spacing:.02em; }
+  .ohlc-details summary:hover{ color:var(--text); }
+  .ohlc-details[open] summary{ color:var(--text); margin-bottom:4px; }
+
   .csv-import{ margin-bottom:16px; }
   .csv-import input[type="file"]{
     width:100%; background:var(--bg); border:1px solid var(--line); color:var(--muted);
@@ -391,6 +396,20 @@
   .summary-legend .nm{ color:var(--text); }
   .summary-legend .pc{ color:var(--muted); margin-left:auto; font-variant-numeric:tabular-nums; }
   .summary-empty{ color:var(--muted-2); font-size:12px; text-align:center; padding:24px 0; }
+
+  .fx-row{
+    display:flex; align-items:end; gap:14px; flex-wrap:wrap; padding:12px 14px; margin-bottom:18px;
+    background:var(--bg); border:1px solid var(--line); border-radius:8px;
+  }
+  .fx-field label{ display:block; font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin-bottom:5px; }
+  .fx-field input{
+    width:110px; background:var(--panel); border:1px solid var(--line); color:var(--text);
+    font-family:inherit; font-size:12.5px; padding:7px 9px; border-radius:5px; outline:none;
+  }
+  .fx-field input:focus{ border-color:var(--red); }
+  .fx-total{ margin-left:auto; text-align:right; }
+  .fx-total .n{ font-size:17px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .fx-total .l{ color:var(--muted-2); font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; margin-top:2px; }
 
   /* ---------- bulk update ---------- */
   .bulk-list{ max-height:340px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; margin-bottom:6px; }
@@ -563,6 +582,16 @@
           <input type="number" id="fROE" placeholder="例: 12.0" step="0.01">
         </div>
       </div>
+      <div class="row2">
+        <div class="field">
+          <label>次回決算発表日</label>
+          <input type="date" id="fEarningsDate">
+        </div>
+        <div class="field">
+          <label>配当権利確定日</label>
+          <input type="date" id="fDividendDate">
+        </div>
+      </div>
 
       <div class="divider"><span>ニュース・関連リンク (最大2件)</span></div>
       <div class="field">
@@ -616,6 +645,18 @@
         <button type="button" class="seg-btn active" data-range="ALL">ALL</button>
       </div>
     </div>
+    <div class="chart-toolbar">
+      <div class="seg" id="typeSeg">
+        <button type="button" class="seg-btn active" data-charttype="line">線グラフ</button>
+        <button type="button" class="seg-btn" data-charttype="candle">ローソク足</button>
+      </div>
+      <div class="seg" id="maSeg">
+        <button type="button" class="seg-btn" data-ma="5">MA5</button>
+        <button type="button" class="seg-btn" data-ma="25">MA25</button>
+        <button type="button" class="seg-btn" data-ma="75">MA75</button>
+      </div>
+    </div>
+    <p class="hint" id="maHint" style="display:none; margin-top:-8px;">移動平均線は日足表示のときだけ使えます。</p>
 
     <div class="chart-legend" id="chartLegend"></div>
     <div class="chart-wrap" id="chartWrap"></div>
@@ -627,11 +668,28 @@
         <input type="date" id="fPriceDate" required>
       </div>
       <div class="field">
-        <label id="fPriceLabel">株価</label>
+        <label id="fPriceLabel">株価(終値)</label>
         <input type="number" id="fPriceValue" step="0.01" min="0" placeholder="例: 2686" required>
       </div>
       <button type="submit">＋ 記録</button>
     </form>
+    <details class="ohlc-details">
+      <summary>始値・高値・安値も入力する(ローソク足用、任意)</summary>
+      <div class="row2" style="margin-top:10px;">
+        <div class="field">
+          <label>始値</label>
+          <input type="number" id="fPriceOpen" step="0.01" min="0" placeholder="任意">
+        </div>
+        <div class="field">
+          <label>高値</label>
+          <input type="number" id="fPriceHigh" step="0.01" min="0" placeholder="任意">
+        </div>
+      </div>
+      <div class="field">
+        <label>安値</label>
+        <input type="number" id="fPriceLow" step="0.01" min="0" placeholder="任意">
+      </div>
+    </details>
     <p class="hint">記録は常に正確な日付で保存されます。日足/週足/月足は表示の集計単位で、週足・月足は各期間内で最新の記録値を1点として表示します。</p>
 
     <div class="csv-import">
@@ -715,6 +773,19 @@
 <div class="overlay" id="summaryOverlay">
   <div class="modal wide">
     <h2><span>ポートフォリオ概要</span><span class="x" id="closeSummary">×</span></h2>
+
+    <div class="fx-row" id="fxRow">
+      <div class="fx-field">
+        <label>USD/JPY</label>
+        <input type="number" id="fxUsdRate" step="0.01" min="0" placeholder="例: 150.00">
+      </div>
+      <div class="fx-field">
+        <label>CHF/JPY</label>
+        <input type="number" id="fxChfRate" step="0.01" min="0" placeholder="例: 185.00">
+      </div>
+      <div class="fx-total" id="summaryFxTotal"></div>
+    </div>
+
     <div id="summaryContent"></div>
   </div>
 </div>
@@ -1043,6 +1114,43 @@
     const h = getSortedHistory(s);
     return h.length ? Number(h[h.length-1].price) : null;
   }
+  function getPeriodReturn(s, days){
+    const h = getSortedHistory(s);
+    if(h.length < 2) return null;
+    const latestEntry = h[h.length-1];
+    const latest = Number(latestEntry.price);
+    const cutoff = new Date(latestEntry.date+'T00:00:00');
+    cutoff.setDate(cutoff.getDate() - days);
+    let base = null;
+    for(let i=h.length-2;i>=0;i--){
+      if(new Date(h[i].date+'T00:00:00') <= cutoff){ base = h[i]; break; }
+    }
+    if(!base) return null;
+    const basePrice = Number(base.price);
+    return basePrice !== 0 ? (latest - basePrice) / basePrice * 100 : null;
+  }
+  function getYTDReturn(s){
+    const h = getSortedHistory(s);
+    if(h.length < 2) return null;
+    const latestEntry = h[h.length-1];
+    const latest = Number(latestEntry.price);
+    const jan1 = latestEntry.date.slice(0,4) + '-01-01';
+    let base = null;
+    for(let i=0;i<h.length-1;i++){
+      if(h[i].date < jan1) base = h[i];
+      else break;
+    }
+    if(!base && h[0].date >= jan1 && h[0].date < latestEntry.date) base = h[0];
+    if(!base) return null;
+    const basePrice = Number(base.price);
+    return basePrice !== 0 ? (latest - basePrice) / basePrice * 100 : null;
+  }
+  function daysUntil(dateStr){
+    if(!dateStr) return null;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const target = new Date(dateStr+'T00:00:00');
+    return Math.round((target - today) / 86400000);
+  }
   function getChangePct(s){
     const h = getSortedHistory(s);
     if(h.length < 2) return null;
@@ -1127,6 +1235,9 @@
       const pnlHtml = renderPnLRow(s);
       const targetHtml = renderTargetRow(s);
       const memoHtml = renderMemoRow(s);
+      const periodReturnsHtml = renderPeriodReturnsRow(s);
+      const dateCountdownHtml = renderDateCountdownRow(s);
+      const dividendEstHtml = renderDividendEstimateRow(s);
       const ccy = s.currency || 'JPY';
 
       return `
@@ -1144,8 +1255,11 @@
           ${newsHtml ? `<div class="news">${newsHtml}</div>` : ''}
           ${sparkHtml}
           ${pnlHtml}
+          ${dividendEstHtml}
           ${fundHtml}
           ${targetHtml}
+          ${periodReturnsHtml}
+          ${dateCountdownHtml}
           ${memoHtml}
         </div>
         <div class="col">
@@ -1213,6 +1327,40 @@
     if(!s.memo || !s.memo.trim()) return '';
     const preview = s.memo.length > 50 ? s.memo.slice(0,50) + '…' : s.memo;
     return `<div class="news" title="${escAttr(s.memo)}">📝 ${esc(preview)}</div>`;
+  }
+
+  function renderPeriodReturnsRow(s){
+    const entries = [
+      ['1週間', getPeriodReturn(s, 7)],
+      ['1か月', getPeriodReturn(s, 30)],
+      ['年初来', getYTDReturn(s)]
+    ];
+    const chips = entries.filter(([,v]) => v !== null).map(([label, v]) => {
+      const sign = v >= 0 ? '+' : '';
+      const color = v >= 0 ? 'var(--green)' : 'var(--red)';
+      return `<span class="fund-chip">${label}<b style="color:${color};">${sign}${v.toFixed(1)}%</b></span>`;
+    });
+    if(chips.length === 0) return '';
+    return `<div class="fund-row">${chips.join('')}</div>`;
+  }
+
+  function renderDateCountdownRow(s){
+    const chips = [];
+    const ed = daysUntil(s.earningsDate);
+    if(ed !== null && ed >= 0) chips.push(`<span class="fund-chip">📅 決算まで<b>${ed === 0 ? '本日' : ed + '日'}</b></span>`);
+    const dd = daysUntil(s.dividendDate);
+    if(dd !== null && dd >= 0) chips.push(`<span class="fund-chip">💰 配当権利確定まで<b>${dd === 0 ? '本日' : dd + '日'}</b></span>`);
+    if(chips.length === 0) return '';
+    return `<div class="fund-row">${chips.join('')}</div>`;
+  }
+
+  function renderDividendEstimateRow(s){
+    const shares = Number(s.shares) || 0;
+    const latest = getLatestPrice(s);
+    if(shares <= 0 || latest === null || s.dividendYield === null || s.dividendYield === undefined || s.dividendYield === '') return '';
+    const annual = latest * shares * (Number(s.dividendYield) / 100);
+    if(!isFinite(annual) || annual <= 0) return '';
+    return `<div class="spark-row"><span class="spark-price" style="color:var(--muted);">年間配当(予想) <b style="color:var(--text);">${fmt(annual, s.currency)}</b></span></div>`;
   }
 
   function renderFundRow(s){
@@ -1362,6 +1510,8 @@
       document.getElementById('fDivYield').value = s.dividendYield ?? '';
       document.getElementById('fROE').value = s.roe ?? '';
       document.getElementById('fMemo').value = s.memo || '';
+      document.getElementById('fEarningsDate').value = s.earningsDate || '';
+      document.getElementById('fDividendDate').value = s.dividendDate || '';
       overlay.classList.add('show');
     }
 
@@ -1400,6 +1550,8 @@
       dividendYield: document.getElementById('fDivYield').value === '' ? null : Number(document.getElementById('fDivYield').value),
       roe: document.getElementById('fROE').value === '' ? null : Number(document.getElementById('fROE').value),
       memo: document.getElementById('fMemo').value.trim(),
+      earningsDate: document.getElementById('fEarningsDate').value || null,
+      dividendDate: document.getElementById('fDividendDate').value || null,
       news
     };
 
@@ -1427,6 +1579,9 @@
   let currentChartId = null;
   let chartPoints = [];
   let chartCurrency = 'JPY';
+  let chartDisplayType = 'line';
+  let maEnabled = { 5:false, 25:false, 75:false };
+  const MA_COLORS = { 5:'#5b8def', 25:'#3ddc84', 75:'#b06de8' };
   const CHART_W = 580, CHART_H = 220;
 
   function filterByRange(history, range){
@@ -1459,12 +1614,71 @@
     return order.map(k => buckets[k]);
   }
 
+  function aggregateOHLC(history, granularity){
+    if(history.length === 0) return [];
+    if(granularity === 'daily'){
+      return history.map(e => ({
+        date: e.date,
+        open: e.open !== undefined ? Number(e.open) : Number(e.price),
+        high: e.high !== undefined ? Number(e.high) : Number(e.price),
+        low: e.low !== undefined ? Number(e.low) : Number(e.price),
+        price: Number(e.price)
+      }));
+    }
+    const buckets = {}; const order = [];
+    history.forEach(e => {
+      const d = new Date(e.date);
+      const key = granularity === 'weekly' ? isoWeekKey(d) : `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      const o = e.open !== undefined ? Number(e.open) : Number(e.price);
+      const h = e.high !== undefined ? Number(e.high) : Number(e.price);
+      const l = e.low !== undefined ? Number(e.low) : Number(e.price);
+      const c = Number(e.price);
+      if(!buckets[key]){
+        buckets[key] = { date: e.date, open: o, high: h, low: l, price: c };
+        order.push(key);
+      } else {
+        const b = buckets[key];
+        if(e.date >= b.date){ b.date = e.date; b.price = c; } // latest close represents the bucket's close
+        if(h > b.high) b.high = h;
+        if(l < b.low) b.low = l;
+        // open stays as the first-seen value in this bucket (buckets are built in chronological order)
+      }
+    });
+    return order.map(k => buckets[k]);
+  }
+
+  function computeMA(rawHistory, period){
+    const map = {};
+    for(let i=0;i<rawHistory.length;i++){
+      if(i+1 < period) continue;
+      let sum = 0;
+      for(let j=i-period+1;j<=i;j++) sum += Number(rawHistory[j].price);
+      map[rawHistory[i].date] = sum/period;
+    }
+    return map;
+  }
+
+  function updateMaAvailability(){
+    const daily = chartGranularity === 'daily';
+    document.getElementById('maHint').style.display = daily ? 'none' : 'block';
+    document.querySelectorAll('#maSeg .seg-btn').forEach(b => {
+      b.disabled = !daily;
+      b.style.opacity = daily ? '1' : '.35';
+      b.style.cursor = daily ? 'pointer' : 'not-allowed';
+    });
+    if(!daily){
+      maEnabled = { 5:false, 25:false, 75:false };
+      document.querySelectorAll('#maSeg .seg-btn').forEach(b => b.classList.remove('active'));
+    }
+  }
+
   document.getElementById('granSeg').addEventListener('click', (e)=>{
     const btn = e.target.closest('.seg-btn');
     if(!btn) return;
     document.querySelectorAll('#granSeg .seg-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     chartGranularity = btn.dataset.gran;
+    updateMaAvailability();
     const s = stocks.find(x => x.id === currentChartId);
     if(s) renderChart(s);
   });
@@ -1477,6 +1691,24 @@
     const s = stocks.find(x => x.id === currentChartId);
     if(s) renderChart(s);
   });
+  document.getElementById('typeSeg').addEventListener('click', (e)=>{
+    const btn = e.target.closest('.seg-btn');
+    if(!btn) return;
+    document.querySelectorAll('#typeSeg .seg-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    chartDisplayType = btn.dataset.charttype;
+    const s = stocks.find(x => x.id === currentChartId);
+    if(s) renderChart(s);
+  });
+  document.getElementById('maSeg').addEventListener('click', (e)=>{
+    const btn = e.target.closest('.seg-btn');
+    if(!btn || btn.disabled) return;
+    const period = btn.dataset.ma;
+    maEnabled[period] = !maEnabled[period];
+    btn.classList.toggle('active', maEnabled[period]);
+    const s = stocks.find(x => x.id === currentChartId);
+    if(s) renderChart(s);
+  });
 
   function openChart(id){
     const s = stocks.find(x => x.id === id);
@@ -1484,14 +1716,23 @@
     currentChartId = id;
     chartGranularity = 'daily';
     chartRange = 'ALL';
+    chartDisplayType = 'line';
+    maEnabled = { 5:false, 25:false, 75:false };
     document.querySelectorAll('#granSeg .seg-btn').forEach(b=>b.classList.remove('active'));
     document.querySelector('#granSeg .seg-btn[data-gran="daily"]').classList.add('active');
     document.querySelectorAll('#rangeSeg .seg-btn').forEach(b=>b.classList.remove('active'));
     document.querySelector('#rangeSeg .seg-btn[data-range="ALL"]').classList.add('active');
+    document.querySelectorAll('#typeSeg .seg-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelector('#typeSeg .seg-btn[data-charttype="line"]').classList.add('active');
+    document.querySelectorAll('#maSeg .seg-btn').forEach(b=>b.classList.remove('active'));
+    updateMaAvailability();
     document.getElementById('chartStockId').value = id;
     document.getElementById('chartTitle').textContent = `${s.name} の値動き`;
     document.getElementById('fPriceDate').value = new Date().toISOString().slice(0,10);
     document.getElementById('fPriceValue').value = '';
+    document.getElementById('fPriceOpen').value = '';
+    document.getElementById('fPriceHigh').value = '';
+    document.getElementById('fPriceLow').value = '';
     document.getElementById('fPriceLabel').textContent = `株価 (${s.currency || 'JPY'})`;
     renderChart(s);
     chartOverlay.classList.add('show');
@@ -1502,18 +1743,26 @@
 
   function renderChart(s){
     const rawHistory = (s.priceHistory || []).slice().sort((a,b)=> a.date.localeCompare(b.date));
-    const history = aggregateHistory(filterByRange(rawHistory, chartRange), chartGranularity);
+    const rangeFiltered = filterByRange(rawHistory, chartRange);
+    const isCandle = chartDisplayType === 'candle';
+    const history = isCandle
+      ? aggregateOHLC(rangeFiltered, chartGranularity)
+      : aggregateHistory(rangeFiltered, chartGranularity);
     const wrap = document.getElementById('chartWrap');
     const legend = document.getElementById('chartLegend');
     const historyList = document.getElementById('historyList');
     const ccy = s.currency || 'JPY';
     const ccySym = CCY_SYMBOL[ccy] || '¥';
+    const activeMA = [5,25,75].filter(p => maEnabled[p] && chartGranularity === 'daily');
 
     // legend
-    const legendItems = [`<span><i style="background:var(--red)"></i>株価 (${ccy})</span>`];
+    const legendItems = isCandle
+      ? [`<span><i style="background:var(--green)"></i>上昇</span>`, `<span><i style="background:var(--red)"></i>下落</span>`]
+      : [`<span><i style="background:var(--red)"></i>株価 (${ccy})</span>`];
     if(s.cost !== null && s.cost !== undefined) legendItems.push(`<span><i style="background:var(--muted-2);border-top:1px dashed var(--muted-2);background:none;"></i>取得単価 ${fmt(s.cost, ccy)}</span>`);
     if(s.buyTarget !== null && s.buyTarget !== undefined) legendItems.push(`<span><i style="background:none;border-top:1px dashed #e8b04b;"></i>買いたい価格 ${fmt(s.buyTarget, ccy)}</span>`);
     if(s.sellTarget !== null && s.sellTarget !== undefined) legendItems.push(`<span><i style="background:none;border-top:1px dashed var(--red);"></i>売りたい価格 ${fmt(s.sellTarget, ccy)}</span>`);
+    activeMA.forEach(p => legendItems.push(`<span><i style="background:${MA_COLORS[p]}"></i>MA${p}</span>`));
     legend.innerHTML = legendItems.join('');
 
     // chart svg
@@ -1526,10 +1775,16 @@
       chartPoints = [];
       wrap.innerHTML = `<div class="history-empty" style="padding:40px 0;">選択した期間に一致する記録がありません。期間を変更してみてください。</div>`;
     } else {
-      const prices = history.map(e => Number(e.price));
+      const maMaps = {};
+      activeMA.forEach(p => { maMaps[p] = computeMA(rawHistory, p); });
+
+      const closeValues = history.map(e => Number(e.price));
+      const ohlcLows = isCandle ? history.map(e => Number(e.low)) : [];
+      const ohlcHighs = isCandle ? history.map(e => Number(e.high)) : [];
+      const maValues = activeMA.flatMap(p => history.map(e => maMaps[p][e.date]).filter(v => v !== undefined));
       const refs = [s.cost, s.buyTarget, s.sellTarget].filter(v => v !== null && v !== undefined && v !== '').map(Number);
-      let min = Math.min(...prices, ...refs);
-      let max = Math.max(...prices, ...refs);
+      let min = Math.min(...closeValues, ...(isCandle ? ohlcLows : []), ...maValues, ...refs);
+      let max = Math.max(...closeValues, ...(isCandle ? ohlcHighs : []), ...maValues, ...refs);
       if(min === max){ min -= 1; max += 1; }
       const rangePad = (max - min) * 0.08;
       min -= rangePad; max += rangePad;
@@ -1537,8 +1792,6 @@
 
       const xFor = (i) => padL + (history.length === 1 ? (W-padL-padR)/2 : (i/(history.length-1)) * (W - padL - padR));
       const yFor = (v) => padT + (H - padT - padB) - ((v - min)/range) * (H - padT - padB);
-
-      const linePts = history.map((e,i) => `${xFor(i).toFixed(1)},${yFor(Number(e.price)).toFixed(1)}`).join(' ');
 
       // gridlines (4 horizontal)
       let gridSvg = '';
@@ -1560,10 +1813,38 @@
       // date labels (first / last)
       const firstDate = history[0].date, lastDate = history[history.length-1].date;
 
-      // dots
-      const dots = history.map((e,i) => `<circle cx="${xFor(i).toFixed(1)}" cy="${yFor(Number(e.price)).toFixed(1)}" r="2.5" fill="var(--red)"/>`).join('');
+      let seriesSvg = '';
+      if(isCandle){
+        // candlestick width scales with spacing, capped
+        const step = history.length > 1 ? (W - padL - padR) / (history.length - 1) : (W - padL - padR);
+        const bodyW = Math.max(2, Math.min(step * 0.55, 14));
+        seriesSvg = history.map((e,i) => {
+          const x = xFor(i);
+          const o = Number(e.open), c = Number(e.price), hi = Number(e.high), lo = Number(e.low);
+          const up = c >= o;
+          const color = up ? 'var(--green)' : 'var(--red)';
+          const yO = yFor(o), yC = yFor(c), yHi = yFor(hi), yLo = yFor(lo);
+          const bodyTop = Math.min(yO, yC), bodyH = Math.max(1.2, Math.abs(yC - yO));
+          return `<line x1="${x.toFixed(1)}" y1="${yHi.toFixed(1)}" x2="${x.toFixed(1)}" y2="${yLo.toFixed(1)}" stroke="${color}" stroke-width="1.2"/>` +
+                 `<rect x="${(x-bodyW/2).toFixed(1)}" y="${bodyTop.toFixed(1)}" width="${bodyW.toFixed(1)}" height="${bodyH.toFixed(1)}" fill="${color}"/>`;
+        }).join('');
+        chartPoints = history.map((e,i) => ({ date: e.date, price: Number(e.price), open: Number(e.open), high: Number(e.high), low: Number(e.low), x: xFor(i), y: yFor(Number(e.price)) }));
+      } else {
+        const linePts = history.map((e,i) => `${xFor(i).toFixed(1)},${yFor(Number(e.price)).toFixed(1)}`).join(' ');
+        const dots = history.map((e,i) => `<circle cx="${xFor(i).toFixed(1)}" cy="${yFor(Number(e.price)).toFixed(1)}" r="2.5" fill="var(--red)"/>`).join('');
+        seriesSvg = `<polyline points="${linePts}" fill="none" stroke="var(--red)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>${dots}`;
+        chartPoints = history.map((e,i) => ({ date: e.date, price: Number(e.price), x: xFor(i), y: yFor(Number(e.price)) }));
+      }
 
-      chartPoints = history.map((e,i) => ({ date: e.date, price: Number(e.price), x: xFor(i), y: yFor(Number(e.price)) }));
+      // moving average overlays (daily granularity only)
+      const maSvg = activeMA.map(p => {
+        const pts = history.map((e,i) => {
+          const v = maMaps[p][e.date];
+          return v === undefined ? null : `${xFor(i).toFixed(1)},${yFor(v).toFixed(1)}`;
+        }).filter(Boolean).join(' ');
+        if(!pts) return '';
+        return `<polyline points="${pts}" fill="none" stroke="${MA_COLORS[p]}" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/>`;
+      }).join('');
 
       wrap.innerHTML = `
         <svg width="100%" viewBox="0 0 ${W} ${H}" style="overflow:visible; touch-action:none;">
@@ -1571,8 +1852,8 @@
           ${refLine(s.cost, 'var(--muted-2)')}
           ${refLine(s.buyTarget, '#e8b04b')}
           ${refLine(s.sellTarget, 'var(--red)')}
-          <polyline points="${linePts}" fill="none" stroke="var(--red)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-          ${dots}
+          ${seriesSvg}
+          ${maSvg}
           <text x="${padL}" y="${H-6}" font-size="9.5" fill="var(--muted-2)" font-family="IBM Plex Mono, monospace">${firstDate}</text>
           <text x="${W-padR}" y="${H-6}" text-anchor="end" font-size="9.5" fill="var(--muted-2)" font-family="IBM Plex Mono, monospace">${lastDate}</text>
           <line id="crossLine" x1="0" y1="${padT}" x2="0" y2="${H-padB}" stroke="var(--text)" stroke-width="1" stroke-dasharray="3,3" opacity="0"/>
@@ -1620,7 +1901,16 @@
       crossLine.setAttribute('x1', nearest.x); crossLine.setAttribute('x2', nearest.x); crossLine.setAttribute('opacity','1');
       crossDot.setAttribute('cx', nearest.x); crossDot.setAttribute('cy', nearest.y); crossDot.setAttribute('opacity','1');
 
-      tooltip.innerHTML = `<div style="color:var(--muted);font-size:9.5px;margin-bottom:2px;">${esc(nearest.date)}</div><div style="font-weight:600;">${fmt(nearest.price, chartCurrency)}</div>`;
+      const hasOHLC = chartDisplayType === 'candle' && nearest.open !== undefined;
+      tooltip.innerHTML = hasOHLC
+        ? `<div style="color:var(--muted);font-size:9.5px;margin-bottom:3px;">${esc(nearest.date)}</div>
+           <div style="display:grid; grid-template-columns:auto auto; gap:1px 8px; font-size:10.5px;">
+             <span style="color:var(--muted);">始値</span><span>${fmt(nearest.open, chartCurrency)}</span>
+             <span style="color:var(--muted);">高値</span><span>${fmt(nearest.high, chartCurrency)}</span>
+             <span style="color:var(--muted);">安値</span><span>${fmt(nearest.low, chartCurrency)}</span>
+             <span style="color:var(--muted);">終値</span><span style="font-weight:600;">${fmt(nearest.price, chartCurrency)}</span>
+           </div>`
+        : `<div style="color:var(--muted);font-size:9.5px;margin-bottom:2px;">${esc(nearest.date)}</div><div style="font-weight:600;">${fmt(nearest.price, chartCurrency)}</div>`;
       tooltip.style.display = 'block';
 
       const wrapRect = wrap.getBoundingClientRect();
@@ -1791,12 +2081,22 @@
     const date = document.getElementById('fPriceDate').value;
     const price = document.getElementById('fPriceValue').value;
     if(!date || price === ''){ toast('日付と株価を入力してください'); return; }
+    const openVal = document.getElementById('fPriceOpen').value;
+    const highVal = document.getElementById('fPriceHigh').value;
+    const lowVal = document.getElementById('fPriceLow').value;
+    const entry = { date, price: Number(price) };
+    if(openVal !== '') entry.open = Number(openVal);
+    if(highVal !== '') entry.high = Number(highVal);
+    if(lowVal !== '') entry.low = Number(lowVal);
     s.priceHistory = s.priceHistory || [];
     const existing = s.priceHistory.findIndex(e2 => e2.date === date);
-    if(existing > -1){ s.priceHistory[existing].price = Number(price); }
-    else { s.priceHistory.push({ date, price: Number(price) }); }
+    if(existing > -1){ Object.assign(s.priceHistory[existing], entry); }
+    else { s.priceHistory.push(entry); }
     persist();
     document.getElementById('fPriceValue').value = '';
+    document.getElementById('fPriceOpen').value = '';
+    document.getElementById('fPriceHigh').value = '';
+    document.getElementById('fPriceLow').value = '';
     renderChart(s);
     render();
     toast('記録しました');
@@ -1813,11 +2113,22 @@
       const m = cols[0].match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
       if(!m) continue; // skip header row / invalid lines
       const date = `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
-      // 5列(日にち/始値/高値/安値/終値)なら終値、2列(日付/価格)ならそのまま
-      const priceRaw = cols.length >= 5 ? cols[4] : cols[1];
-      const price = parseFloat(priceRaw.replace(/,/g, ''));
-      if(!isFinite(price)) continue;
-      entries.push({ date, price });
+      // 5列(日にち/始値/高値/安値/終値)なら終値+OHLCを保存、2列(日付/価格)なら価格のみ
+      const num = (raw) => parseFloat(String(raw).replace(/,/g, ''));
+      const entry = { date };
+      if(cols.length >= 5){
+        const open = num(cols[1]), high = num(cols[2]), low = num(cols[3]), close = num(cols[4]);
+        if(!isFinite(close)) continue;
+        entry.price = close;
+        if(isFinite(open)) entry.open = open;
+        if(isFinite(high)) entry.high = high;
+        if(isFinite(low)) entry.low = low;
+      } else {
+        const price = num(cols[1]);
+        if(!isFinite(price)) continue;
+        entry.price = price;
+      }
+      entries.push(entry);
     }
     return entries;
   }
@@ -1842,8 +2153,8 @@
     s.priceHistory = s.priceHistory || [];
     entries.forEach(e2 => {
       const idx = s.priceHistory.findIndex(p => p.date === e2.date);
-      if(idx > -1) s.priceHistory[idx].price = e2.price;
-      else s.priceHistory.push({ date: e2.date, price: e2.price });
+      if(idx > -1) Object.assign(s.priceHistory[idx], e2);
+      else s.priceHistory.push(e2);
     });
     persist();
     document.getElementById('csvPasteArea').value = '';
@@ -2165,11 +2476,15 @@ deleteAccountForm.addEventListener('submit', async (e)=>{
     return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${circles}</svg>`;
   }
 
+  let summaryValueByCurrency = {};
+
   function renderSummary(){
     const el = document.getElementById('summaryContent');
     const holdings = stocks.filter(s => (Number(s.shares)||0) > 0);
+    summaryValueByCurrency = {};
     if(holdings.length === 0){
       el.innerHTML = `<div class="summary-empty">保有中の銘柄がありません。保有株数を入力すると、ここに評価額と構成比が表示されます。</div>`;
+      updateFxTotal();
       return;
     }
     const byCurrency = {};
@@ -2181,7 +2496,7 @@ deleteAccountForm.addEventListener('submit', async (e)=>{
     let html = '';
     Object.keys(byCurrency).sort().forEach(ccy => {
       const list = byCurrency[ccy];
-      let totalValue = 0, totalCost = 0, hasCost = false;
+      let totalValue = 0, totalCost = 0, hasCost = false, totalDividend = 0, hasDividend = false;
       const items = [];
       list.forEach(s => {
         const latest = getLatestPrice(s);
@@ -2192,10 +2507,15 @@ deleteAccountForm.addEventListener('submit', async (e)=>{
           totalCost += Number(s.cost)*shares;
           hasCost = true;
         }
+        if(value !== null && s.dividendYield !== null && s.dividendYield !== undefined && s.dividendYield !== ''){
+          totalDividend += value * (Number(s.dividendYield)/100);
+          hasDividend = true;
+        }
         items.push({ name: s.name, value });
       });
       const pnl = hasCost ? (totalValue - totalCost) : null;
       const pnlPct = (hasCost && totalCost > 0) ? (pnl/totalCost*100) : null;
+      summaryValueByCurrency[ccy] = totalValue;
 
       const segments = items.filter(i => i.value !== null && i.value > 0)
         .sort((a,b) => b.value - a.value)
@@ -2213,6 +2533,7 @@ deleteAccountForm.addEventListener('submit', async (e)=>{
             <div class="summary-stat"><div class="n">${fmt(totalValue, ccy)}</div><div class="l">評価額合計</div></div>
             ${pnl !== null ? `<div class="summary-stat"><div class="n ${pnl>=0?'green':'red'}">${pnl>=0?'+':''}${fmt(pnl, ccy)}</div><div class="l">含み損益</div></div>` : ''}
             ${pnlPct !== null ? `<div class="summary-stat"><div class="n ${pnlPct>=0?'green':'red'}">${pnlPct>=0?'+':''}${pnlPct.toFixed(1)}%</div><div class="l">損益率</div></div>` : ''}
+            ${hasDividend ? `<div class="summary-stat"><div class="n">${fmt(totalDividend, ccy)}</div><div class="l">年間配当(予想)</div></div>` : ''}
           </div>
           <div class="summary-grid">
             ${donut || '<div class="summary-empty" style="padding:10px 0;">価格記録がまだありません</div>'}
@@ -2222,7 +2543,54 @@ deleteAccountForm.addEventListener('submit', async (e)=>{
     });
 
     el.innerHTML = html;
+    updateFxTotal();
   }
+
+  // ---- 為替換算(手入力レート) ----
+  function loadFxRates(){
+    try{
+      const raw = localStorage.getItem('fxRates');
+      return raw ? JSON.parse(raw) : {};
+    }catch(e){ return {}; }
+  }
+  function saveFxRates(rates){
+    try{ localStorage.setItem('fxRates', JSON.stringify(rates)); }catch(e){}
+  }
+  function updateFxTotal(){
+    const totalEl = document.getElementById('summaryFxTotal');
+    if(!totalEl) return;
+    const usdRate = parseFloat(document.getElementById('fxUsdRate').value);
+    const chfRate = parseFloat(document.getElementById('fxChfRate').value);
+    const hasAnyForeign = (summaryValueByCurrency.USD || summaryValueByCurrency.CHF);
+    if(!hasAnyForeign && !summaryValueByCurrency.JPY){
+      totalEl.innerHTML = '';
+      return;
+    }
+    let total = summaryValueByCurrency.JPY || 0;
+    let missingRate = false;
+    if(summaryValueByCurrency.USD){
+      if(isFinite(usdRate) && usdRate > 0) total += summaryValueByCurrency.USD * usdRate;
+      else missingRate = true;
+    }
+    if(summaryValueByCurrency.CHF){
+      if(isFinite(chfRate) && chfRate > 0) total += summaryValueByCurrency.CHF * chfRate;
+      else missingRate = true;
+    }
+    totalEl.innerHTML = `<div class="n">${fmt(total, 'JPY')}</div><div class="l">${missingRate ? 'レート未入力分は含まれません' : '全体の評価額(円換算)'}</div>`;
+  }
+  (function initFxInputs(){
+    const rates = loadFxRates();
+    const usdInput = document.getElementById('fxUsdRate');
+    const chfInput = document.getElementById('fxChfRate');
+    if(rates.USD) usdInput.value = rates.USD;
+    if(rates.CHF) chfInput.value = rates.CHF;
+    [usdInput, chfInput].forEach(input => {
+      input.addEventListener('input', ()=>{
+        saveFxRates({ USD: usdInput.value, CHF: chfInput.value });
+        updateFxTotal();
+      });
+    });
+  })();
 
   // ---- PWA: サービスワーカー登録 ----
   if('serviceWorker' in navigator){
