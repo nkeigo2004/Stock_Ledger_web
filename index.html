@@ -411,6 +411,17 @@
   .fx-total .n{ font-size:17px; font-weight:600; font-variant-numeric:tabular-nums; }
   .fx-total .l{ color:var(--muted-2); font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; margin-top:2px; }
 
+  /* ---------- NISA quota ---------- */
+  .nisa-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .nisa-block{ background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px; }
+  .nisa-block h3{ font-size:11.5px; letter-spacing:.03em; color:var(--muted); margin-bottom:10px; font-weight:600; }
+  .nisa-block .field{ margin-bottom:10px; }
+  .nisa-bar{ height:8px; border-radius:4px; background:var(--bg); border:1px solid var(--line); overflow:hidden; margin-bottom:8px; }
+  .nisa-bar-fill{ height:100%; width:0%; background:var(--green); transition:width .25s, background .25s; }
+  .nisa-remain{ font-size:11.5px; color:var(--text); }
+  .nisa-remain b{ font-variant-numeric:tabular-nums; }
+  @media (max-width: 560px){ .nisa-grid{ grid-template-columns:1fr; } }
+
   /* ---------- bulk update ---------- */
   .bulk-list{ max-height:340px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; margin-bottom:6px; }
   .bulk-row{ display:flex; align-items:center; gap:10px; padding:8px 2px; border-bottom:1px dashed var(--line-soft); }
@@ -457,6 +468,7 @@
 
   <div class="toolbar">
     <button type="button" class="toolbar-btn" id="openSummary">📊 ポートフォリオ概要</button>
+    <button type="button" class="toolbar-btn" id="openNisa">🏦 NISA投資枠</button>
     <button type="button" class="toolbar-btn" id="openBulkUpdate">📥 価格を一括更新</button>
     <button type="button" class="toolbar-btn" id="exportBtn">⬇️ バックアップ書き出し</button>
     <button type="button" class="toolbar-btn" id="importBtn">⬆️ バックアップ読み込み</button>
@@ -787,6 +799,59 @@
     </div>
 
     <div id="summaryContent"></div>
+  </div>
+</div>
+
+<div class="overlay" id="nisaOverlay">
+  <div class="modal wide">
+    <h2><span>NISA 投資枠</span><span class="x" id="closeNisa">×</span></h2>
+    <p class="hint" style="margin-top:0;">今年これまでに使った金額(取得価格の合計)を入力すると、残りの枠が計算されます。数値は手入力・このブラウザに保存されます。年間枠は年が変わると自動でリセットされます(表示上のみ)。</p>
+
+    <div class="divider"><span>年間投資枠</span></div>
+    <div class="nisa-grid">
+      <div class="nisa-block">
+        <h3>つみたて投資枠(年間120万円)</h3>
+        <div class="field">
+          <label>今年の使用済み金額(円)</label>
+          <input type="number" id="nisaTsumitateUsed" min="0" step="1000" placeholder="例: 300000">
+        </div>
+        <div class="nisa-bar"><div class="nisa-bar-fill" id="nisaTsumitateBar"></div></div>
+        <div class="nisa-remain" id="nisaTsumitateRemain"></div>
+      </div>
+      <div class="nisa-block">
+        <h3>成長投資枠(年間240万円)</h3>
+        <div class="field">
+          <label>今年の使用済み金額(円)</label>
+          <input type="number" id="nisaGrowthUsed" min="0" step="1000" placeholder="例: 500000">
+        </div>
+        <div class="nisa-bar"><div class="nisa-bar-fill" id="nisaGrowthBar"></div></div>
+        <div class="nisa-remain" id="nisaGrowthRemain"></div>
+      </div>
+    </div>
+    <div class="summary-stat" style="margin:16px 0 4px;"><div class="n" id="nisaAnnualTotalRemain"></div><div class="l">年間合計の残り枠(つみたて+成長)</div></div>
+
+    <div class="divider"><span>生涯投資枠(非課税保有限度額)</span></div>
+    <div class="nisa-grid">
+      <div class="nisa-block">
+        <h3>生涯投資枠 合計(1,800万円)</h3>
+        <div class="field">
+          <label>生涯の使用済み金額(簿価、円)</label>
+          <input type="number" id="nisaLifetimeUsed" min="0" step="10000" placeholder="例: 5000000">
+        </div>
+        <div class="nisa-bar"><div class="nisa-bar-fill" id="nisaLifetimeBar"></div></div>
+        <div class="nisa-remain" id="nisaLifetimeRemain"></div>
+      </div>
+      <div class="nisa-block">
+        <h3>うち成長投資枠(内枠上限1,200万円)</h3>
+        <div class="field">
+          <label>成長投資枠の生涯使用済み金額(円)</label>
+          <input type="number" id="nisaLifetimeGrowthUsed" min="0" step="10000" placeholder="例: 2000000">
+        </div>
+        <div class="nisa-bar"><div class="nisa-bar-fill" id="nisaLifetimeGrowthBar"></div></div>
+        <div class="nisa-remain" id="nisaLifetimeGrowthRemain"></div>
+      </div>
+    </div>
+    <p class="hint">生涯投資枠は取得価格(簿価)で管理され、売却すると翌年以降に枠が復活します(年間枠は復活しません)。</p>
   </div>
 </div>
 
@@ -2591,6 +2656,82 @@ deleteAccountForm.addEventListener('submit', async (e)=>{
       });
     });
   })();
+
+  // ---- NISA投資枠 ----
+  const NISA_LIMITS = { tsumitateAnnual: 1200000, growthAnnual: 2400000, lifetimeTotal: 18000000, lifetimeGrowth: 12000000 };
+  const nisaOverlay = document.getElementById('nisaOverlay');
+
+  function loadNisaUsage(){
+    try{
+      const raw = localStorage.getItem('nisaUsage');
+      return raw ? JSON.parse(raw) : {};
+    }catch(e){ return {}; }
+  }
+  function saveNisaUsage(data){
+    try{ localStorage.setItem('nisaUsage', JSON.stringify(data)); }catch(e){}
+  }
+
+  function updateNisaBar(barEl, remainEl, used, limit){
+    const pct = limit > 0 ? Math.min(100, (used/limit)*100) : 0;
+    barEl.style.width = pct + '%';
+    barEl.style.background = pct >= 100 ? 'var(--red)' : (pct >= 80 ? '#e8b04b' : 'var(--green)');
+    const remain = Math.max(0, limit - used);
+    remainEl.innerHTML = `残り <b>${fmt(remain, 'JPY')}</b> <span style="color:var(--muted-2);">(${fmt(used, 'JPY')} / ${fmt(limit, 'JPY')} 使用)</span>`;
+  }
+
+  function readNisaInputs(){
+    return {
+      tsumitateUsed: Number(document.getElementById('nisaTsumitateUsed').value) || 0,
+      growthUsed: Number(document.getElementById('nisaGrowthUsed').value) || 0,
+      lifetimeUsed: Number(document.getElementById('nisaLifetimeUsed').value) || 0,
+      lifetimeGrowthUsed: Number(document.getElementById('nisaLifetimeGrowthUsed').value) || 0
+    };
+  }
+
+  function refreshNisaBars(){
+    const { tsumitateUsed, growthUsed, lifetimeUsed, lifetimeGrowthUsed } = readNisaInputs();
+    updateNisaBar(document.getElementById('nisaTsumitateBar'), document.getElementById('nisaTsumitateRemain'), tsumitateUsed, NISA_LIMITS.tsumitateAnnual);
+    updateNisaBar(document.getElementById('nisaGrowthBar'), document.getElementById('nisaGrowthRemain'), growthUsed, NISA_LIMITS.growthAnnual);
+    updateNisaBar(document.getElementById('nisaLifetimeBar'), document.getElementById('nisaLifetimeRemain'), lifetimeUsed, NISA_LIMITS.lifetimeTotal);
+    updateNisaBar(document.getElementById('nisaLifetimeGrowthBar'), document.getElementById('nisaLifetimeGrowthRemain'), lifetimeGrowthUsed, NISA_LIMITS.lifetimeGrowth);
+    const annualRemainTotal = Math.max(0, NISA_LIMITS.tsumitateAnnual - tsumitateUsed) + Math.max(0, NISA_LIMITS.growthAnnual - growthUsed);
+    document.getElementById('nisaAnnualTotalRemain').textContent = fmt(annualRemainTotal, 'JPY');
+  }
+
+  function renderNisa(){
+    const data = loadNisaUsage();
+    const thisYear = new Date().getFullYear();
+    let tsumitateUsed = Number(data.tsumitateUsed) || 0;
+    let growthUsed = Number(data.growthUsed) || 0;
+    if(data.year && data.year !== thisYear){
+      tsumitateUsed = 0; growthUsed = 0;
+      toast('年が変わったため、年間枠をリセットしました');
+    }
+    const lifetimeUsed = Number(data.lifetimeUsed) || 0;
+    const lifetimeGrowthUsed = Number(data.lifetimeGrowthUsed) || 0;
+
+    document.getElementById('nisaTsumitateUsed').value = tsumitateUsed || '';
+    document.getElementById('nisaGrowthUsed').value = growthUsed || '';
+    document.getElementById('nisaLifetimeUsed').value = lifetimeUsed || '';
+    document.getElementById('nisaLifetimeGrowthUsed').value = lifetimeGrowthUsed || '';
+
+    refreshNisaBars();
+    saveNisaUsage({ year: thisYear, tsumitateUsed, growthUsed, lifetimeUsed, lifetimeGrowthUsed });
+  }
+
+  document.getElementById('openNisa').addEventListener('click', ()=>{
+    renderNisa();
+    nisaOverlay.classList.add('show');
+  });
+  document.getElementById('closeNisa').addEventListener('click', ()=> nisaOverlay.classList.remove('show'));
+  nisaOverlay.addEventListener('click', (e)=>{ if(e.target === nisaOverlay) nisaOverlay.classList.remove('show'); });
+
+  ['nisaTsumitateUsed','nisaGrowthUsed','nisaLifetimeUsed','nisaLifetimeGrowthUsed'].forEach(id => {
+    document.getElementById(id).addEventListener('input', ()=>{
+      saveNisaUsage({ year: new Date().getFullYear(), ...readNisaInputs() });
+      refreshNisaBars();
+    });
+  });
 
   // ---- PWA: サービスワーカー登録 ----
   if('serviceWorker' in navigator){
